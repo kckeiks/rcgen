@@ -468,6 +468,7 @@ impl DistinguishedName {
 			let attr = if let Some(dn) = dn_opt {
 				if rdn_iter.next().is_some() {
 					// no support for distinguished names with more than one attribute
+					panic!("it is here {:?}", rdn_iter.collect::<Vec<_>>());
 					return Err(RcgenError::CouldNotParseCertificate);
 				} else {
 					dn
@@ -477,15 +478,18 @@ impl DistinguishedName {
 			};
 
 			let attr_type_oid = attr.attr_type().iter()
-				.ok_or(RcgenError::CouldNotParseCertificate)?;
+				.ok_or(RcgenError::CouldNotParseCertificate).unwrap();
 			let dn_type = DnType::from_oid(&attr_type_oid.collect::<Vec<_>>());
-			let dn_value = match attr.attr_value().content {
-				DerObjectContent::T61String(s) => DnValue::TeletexString(s.into()),
-				DerObjectContent::PrintableString(s) => DnValue::PrintableString(s.into()),
-				DerObjectContent::UniversalString(s) => DnValue::UniversalString(s.into()),
-				DerObjectContent::UTF8String(s) => DnValue::Utf8String(s.into()),
-				DerObjectContent::BmpString(s) => DnValue::BmpString(s.into()),
-				_ => return Err(RcgenError::CouldNotParseCertificate),
+			let dn_value = match &attr.attr_value().content {
+				DerObjectContent::T61String(s) => DnValue::TeletexString((*s).into()),
+				DerObjectContent::PrintableString(s) => DnValue::PrintableString((*s).into()),
+				DerObjectContent::UniversalString(s) => DnValue::UniversalString((*s).into()),
+				DerObjectContent::UTF8String(s) => DnValue::Utf8String((*s).into()),
+				DerObjectContent::BmpString(s) => DnValue::BmpString((*s).into()),
+				content => {
+					panic!("actually here {:?}", content);
+					return Err(RcgenError::CouldNotParseCertificate);
+				},
 			};
 
 			dn.push(dn_type, dn_value);
@@ -693,13 +697,13 @@ impl CertificateParams {
 	#[cfg(feature = "x509-parser")]
 	pub fn from_ca_cert_der(ca_cert :&[u8], key_pair :KeyPair) -> Result<Self, RcgenError> {
 		let (_remainder, x509) = x509_parser::parse_x509_certificate(ca_cert)
-			.or(Err(RcgenError::CouldNotParseCertificate))?;
+			.or(Err(RcgenError::CouldNotParseCertificate)).unwrap();
 
 		let alg_oid = x509.signature_algorithm.algorithm.iter()
-			.ok_or(RcgenError::CouldNotParseCertificate)?;
-		let alg = SignatureAlgorithm::from_oid(&alg_oid.collect::<Vec<_>>())?;
+			.ok_or(RcgenError::CouldNotParseCertificate).unwrap();
+		let alg = SignatureAlgorithm::from_oid(&alg_oid.collect::<Vec<_>>()).unwrap();
 
-		let dn = DistinguishedName::from_name(&x509.tbs_certificate.subject)?;
+		let dn = DistinguishedName::from_name(&x509.tbs_certificate.subject).unwrap();
 		Ok(
 			CertificateParams {
 				alg,
